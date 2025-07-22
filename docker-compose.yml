@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # API Backend ASP.NET Core
   ratiomaster-api:

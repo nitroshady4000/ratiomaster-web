@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copier les fichiers de configuration npm
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copier le code source
 COPY . .
