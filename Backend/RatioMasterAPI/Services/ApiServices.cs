@@ -1,42 +1,39 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using RatioMaster.Core.Models;
+using RatioMaster.Core.Services;
 using RatioMaster.API.Data;
 using RatioMaster.API.Hubs;
 
-namespace RatioMaster.Core.Services
+namespace RatioMaster.API.Services
 {
-    public class TorrentService : ITorrentService
+    public class ApiTorrentService : CoreTorrentService
     {
         private readonly RatioMasterContext _context;
-        private readonly ILogger<TorrentService> _logger;
         private readonly IHubContext<TorrentHub> _hubContext;
         private readonly Dictionary<int, TorrentClient> _activeTorrents = new();
 
-        public TorrentService(
+        public ApiTorrentService(
             RatioMasterContext context,
-            ILogger<TorrentService> logger,
-            IHubContext<TorrentHub> hubContext)
+            ILogger<ApiTorrentService> logger,
+            IHubContext<TorrentHub> hubContext) : base(logger)
         {
             _context = context;
-            _logger = logger;
             _hubContext = hubContext;
         }
 
-        public async Task<IEnumerable<TorrentInfo>> GetAllTorrentsAsync()
+        public override async Task<IEnumerable<TorrentInfo>> GetAllTorrentsAsync()
         {
             return await _context.Torrents.ToListAsync();
         }
 
-        public async Task<TorrentInfo?> GetTorrentAsync(int id)
+        public override async Task<TorrentInfo?> GetTorrentAsync(int id)
         {
             return await _context.Torrents.FindAsync(id);
         }
 
-        public async Task<TorrentInfo> AddTorrentAsync(AddTorrentRequest request)
+        public override async Task<TorrentInfo> AddTorrentAsync(AddTorrentRequest request)
         {
-            // Pour l'instant, on crée un torrent de base
-            // TODO: Implémenter le parsing du fichier torrent
             var torrentInfo = new TorrentInfo
             {
                 Name = request.Name ?? "Test Torrent",
@@ -60,7 +57,7 @@ namespace RatioMaster.Core.Services
             return torrentInfo;
         }
 
-        public async Task StartTorrentAsync(int id)
+        public override async Task StartTorrentAsync(int id)
         {
             var torrent = await GetTorrentAsync(id);
             if (torrent == null)
@@ -75,7 +72,7 @@ namespace RatioMaster.Core.Services
             _logger.LogInformation($"Torrent démarré: {torrent.Name} (ID: {id})");
         }
 
-        public async Task StopTorrentAsync(int id)
+        public override async Task StopTorrentAsync(int id)
         {
             var torrent = await GetTorrentAsync(id);
             if (torrent == null)
@@ -90,7 +87,7 @@ namespace RatioMaster.Core.Services
             _logger.LogInformation($"Torrent arrêté: {torrent.Name} (ID: {id})");
         }
 
-        public async Task RemoveTorrentAsync(int id)
+        public override async Task RemoveTorrentAsync(int id)
         {
             var torrent = await GetTorrentAsync(id);
             if (torrent != null)
@@ -102,13 +99,7 @@ namespace RatioMaster.Core.Services
             }
         }
 
-        public async Task ManualUpdateAsync(int id)
-        {
-            _logger.LogInformation($"Mise à jour manuelle du torrent {id}");
-            // TODO: Implémenter la mise à jour tracker
-        }
-
-        public async Task<TorrentStatusDto?> GetTorrentStatusAsync(int id)
+        public override async Task<TorrentStatusDto?> GetTorrentStatusAsync(int id)
         {
             var torrent = await GetTorrentAsync(id);
             if (torrent == null) return null;
@@ -131,7 +122,7 @@ namespace RatioMaster.Core.Services
             };
         }
 
-        public async Task StartAllTorrentsAsync()
+        public override async Task StartAllTorrentsAsync()
         {
             var torrents = await _context.Torrents.Where(t => t.Status == TorrentStatus.Stopped).ToListAsync();
             
@@ -148,7 +139,7 @@ namespace RatioMaster.Core.Services
             }
         }
 
-        public async Task StopAllTorrentsAsync()
+        public override async Task StopAllTorrentsAsync()
         {
             var torrents = await _context.Torrents.Where(t => t.Status == TorrentStatus.Running).ToListAsync();
             
@@ -164,102 +155,38 @@ namespace RatioMaster.Core.Services
                 }
             }
         }
-
-        public async Task UpdateAllTorrentsAsync()
-        {
-            _logger.LogInformation("Mise à jour de tous les torrents");
-            // TODO: Implémenter la mise à jour de tous les torrents
-        }
-
-        private string GenerateTestInfoHash()
-        {
-            var random = new Random();
-            var bytes = new byte[20];
-            random.NextBytes(bytes);
-            return Convert.ToHexString(bytes).ToLower();
-        }
     }
 
-    public class TrackerService : ITrackerService
+    public class ApiTorrentBackgroundService : BackgroundService
     {
-        private readonly ILogger<TrackerService> _logger;
+        private readonly ILogger<ApiTorrentBackgroundService> _logger;
+        private readonly IServiceProvider _serviceProvider;
 
-        public TrackerService(ILogger<TrackerService> logger)
+        public ApiTorrentBackgroundService(
+            ILogger<ApiTorrentBackgroundService> logger,
+            IServiceProvider serviceProvider)
         {
             _logger = logger;
-        }
-
-        public async Task<TrackerResponse> AnnounceAsync(TorrentClient client, TrackerEvent eventType)
-        {
-            _logger.LogInformation($"Announce {eventType} pour {client.InfoHash}");
-            
-            // TODO: Implémenter la communication réelle avec les trackers
-            return new TrackerResponse
-            {
-                Complete = 10,
-                Incomplete = 5,
-                Interval = 1800,
-                Peers = new List<Peer>()
-            };
-        }
-
-        public async Task<bool> TestTrackerAsync(string trackerUrl)
-        {
-            _logger.LogInformation($"Test du tracker: {trackerUrl}");
-            return true; // TODO: Implémenter le vrai test
-        }
-    }
-
-    public class SessionService : ISessionService
-    {
-        private readonly ILogger<SessionService> _logger;
-
-        public SessionService(ILogger<SessionService> logger)
-        {
-            _logger = logger;
-        }
-
-        public async Task<IEnumerable<SessionInfo>> GetAvailableSessionsAsync()
-        {
-            // TODO: Lire les sessions depuis le système de fichiers
-            return new List<SessionInfo>();
-        }
-
-        public async Task SaveCurrentSessionAsync(string name, bool stopTorrents)
-        {
-            _logger.LogInformation($"Sauvegarde de la session: {name}");
-            // TODO: Implémenter la sauvegarde
-        }
-
-        public async Task LoadSessionAsync(string sessionPath, bool autoStart)
-        {
-            _logger.LogInformation($"Chargement de la session: {sessionPath}");
-            // TODO: Implémenter le chargement
-        }
-
-        public async Task DeleteSessionAsync(string sessionName)
-        {
-            _logger.LogInformation($"Suppression de la session: {sessionName}");
-            // TODO: Implémenter la suppression
-        }
-    }
-
-    public class TorrentBackgroundService : BackgroundService
-    {
-        private readonly ILogger<TorrentBackgroundService> _logger;
-
-        public TorrentBackgroundService(ILogger<TorrentBackgroundService> logger)
-        {
-            _logger = logger;
+            _serviceProvider = serviceProvider;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Service de fond démarré");
+            _logger.LogInformation("Service de fond API démarré");
             
             while (!stoppingToken.IsCancellationRequested)
             {
-                // TODO: Logique de mise à jour périodique des torrents
+                try
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    // TODO: Logique de mise à jour périodique des torrents
+                    _logger.LogDebug("Background service tick");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Erreur dans le service de fond: {ex.Message}");
+                }
+                
                 await Task.Delay(30000, stoppingToken); // 30 secondes
             }
         }

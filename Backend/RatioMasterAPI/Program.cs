@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RatioMaster.Core.Services;
 using RatioMaster.API.Hubs;
 using RatioMaster.API.Data;
+using RatioMaster.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +15,17 @@ builder.Services.AddSwaggerGen();
 
 // Base de données
 builder.Services.AddDbContext<RatioMasterContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (connectionString?.Contains(":memory:") == true)
+    {
+        options.UseSqlite(connectionString);
+    }
+    else
+    {
+        options.UseSqlServer(connectionString);
+    }
+});
 
 // Redis pour les sessions
 builder.Services.AddStackExchangeRedisCache(options => {
@@ -22,10 +33,10 @@ builder.Services.AddStackExchangeRedisCache(options => {
 });
 
 // Services métier (portés depuis WinForms)
-builder.Services.AddScoped<ITorrentService, TorrentService>();
-builder.Services.AddScoped<ITrackerService, TrackerService>();
-builder.Services.AddScoped<ISessionService, SessionService>();
-builder.Services.AddHostedService<TorrentBackgroundService>();
+builder.Services.AddScoped<ITorrentService, ApiTorrentService>();
+builder.Services.AddScoped<ITrackerService, CoreTrackerService>();
+builder.Services.AddScoped<ISessionService, CoreSessionService>();
+builder.Services.AddHostedService<ApiTorrentBackgroundService>();
 
 // CORS pour le frontend
 builder.Services.AddCors(options =>
